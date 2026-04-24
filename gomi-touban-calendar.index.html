@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゴミ捨て当番カレンダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Bodoni+Moda:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --paper: #f4efe6;
+    --paper-deep: #ebe4d5;
+    --accent: #c8432c;
+    --accent-deep: #8a2a18;
+    --muted: #6b6458;
+    --line: #2a2620;
+    --gold: #b08d3c;
+    --soft: #ddd4c0;
+    --swap: #2d6a4f;
+    --swap-light: #d8f3dc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(200,67,44,0.04) 0%, transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(176,141,60,0.05) 0%, transparent 50%);
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.09 0 0 0 0 0.08 0 0 0 0.1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+  }
+
+  .wrapper {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+    position: relative;
+    z-index: 2;
+  }
+
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    padding-bottom: 24px;
+    border-bottom: 3px double var(--line);
+    margin-bottom: 8px;
+    gap: 24px;
+  }
+
+  .masthead .kicker {
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    font-size: 14px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .masthead h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 800;
+    font-size: clamp(36px, 5vw, 56px);
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+
+  .masthead h1 .dot {
+    color: var(--accent);
+    font-size: 0.5em;
+    vertical-align: super;
+  }
+
+  .meta {
+    text-align: right;
+    font-family: 'Bodoni Moda', serif;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .meta .vol {
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink);
+  }
+
+  .sub-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0 32px;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+
+  .today {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 32px;
+    padding: 36px 40px;
+    background: var(--ink);
+    color: var(--paper);
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .today::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -10%;
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+    opacity: 0.25;
+  }
+
+  .today .label {
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: var(--gold);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    border-left: 1px solid var(--gold);
+    padding-left: 12px;
+    height: 110px;
+  }
+
+  .today .person { position: relative; z-index: 2; }
+
+  .today .person .name {
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 800;
+    font-size: clamp(48px, 8vw, 92px);
+    line-height: 1;
+    letter-spacing: 0.05em;
+  }
+
+  .today .person .when {
+    font-size: 14px;
+    color: var(--soft);
+    margin-top: 14px;
+    letter-spacing: 0.1em;
+  }
+
+  .today .position {
+    text-align: right;
+    position: relative;
+    z-index: 2;
+  }
+
+  .today .position .num {
+    font-family: 'Bodoni Moda', serif;
+    font-size: 80px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .today .position .txt {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--soft);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .rotation {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    align-items: start;
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rotation .hed {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 18px;
+    font-weight: 600;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.3em;
+    border-left: 2px solid var(--accent);
+    padding-left: 8px;
+    align-self: start;
+  }
+
+  .rotation-list {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+
+  .rot-item {
+    padding: 20px 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .rot-item .order {
+    font-family: 'Bodoni Moda', serif;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 6px;
+  }
+
+  .rot-item .nm {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .rot-item .arrow {
+    position: absolute;
+    top: 50%;
+    right: -11px;
+    transform: translateY(-50%);
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700;
+    z-index: 3;
+    background: var(--paper);
+    width: 18px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  .rot-item.is-active {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+  }
+
+  .rot-item.is-active .order,
+  .rot-item.is-active .nm { color: var(--paper); }
+
+  /* SWAP MODE PANEL */
+  .swap-panel {
+    background: var(--paper-deep);
+    border: 2px solid var(--line);
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .swap-panel.is-active {
+    background: var(--swap-light);
+    border-color: var(--swap);
+    border-style: dashed;
+  }
+
+  .swap-info .title {
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+
+  .swap-info .desc {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .swap-panel.is-active .swap-info .title {
+    color: var(--swap);
+  }
+
+  .swap-actions { display: flex; gap: 8px; }
+
+  .history-section {
+    margin-bottom: 40px;
+    padding: 16px 20px;
+    background: var(--paper-deep);
+    border-left: 3px solid var(--gold);
+  }
+
+  .history-section h3 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    color: var(--muted);
+  }
+
+  .history-list {
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.8;
+  }
+
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+
+  .history-item .meta-time {
+    color: var(--muted);
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .section-hed {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .section-hed::before {
+    content: '※';
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  .filter-group { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .filter {
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    background: transparent;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--ink);
+  }
+
+  .filter:hover { background: var(--paper-deep); }
+  .filter.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .schedule { border-top: 2px solid var(--line); }
+
+  .month-group {
+    border-bottom: 1px solid var(--line);
+    padding: 24px 0;
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 32px;
+  }
+
+  .month-label {
+    font-family: 'Bodoni Moda', serif;
+    position: sticky;
+    top: 20px;
+    align-self: start;
+  }
+
+  .month-label .num {
+    font-size: 58px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .month-label .yr {
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .month-label .jp {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--soft);
+    letter-spacing: 0.1em;
+  }
+
+  .weeks { display: flex; flex-direction: column; }
+
+  .week-row {
+    display: grid;
+    grid-template-columns: 80px 130px 1fr auto auto;
+    gap: 20px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px dotted var(--soft);
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .week-row:last-child { border-bottom: none; }
+  .week-row:hover { background: rgba(0,0,0,0.025); }
+
+  .week-row.is-current {
+    background: linear-gradient(90deg, rgba(200,67,44,0.1) 0%, transparent 100%);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+    margin-left: -15px;
+  }
+
+  .week-row.is-past { opacity: 0.42; }
+
+  .week-row.is-swapped {
+    background: linear-gradient(90deg, rgba(45,106,79,0.08) 0%, transparent 100%);
+  }
+
+  /* Swap mode states */
+  body.swap-mode .week-row:not(.is-past) {
+    cursor: pointer;
+    padding-left: 16px;
+    margin-left: -16px;
+    border-left: 3px solid transparent;
+  }
+
+  body.swap-mode .week-row:not(.is-past):hover {
+    background: var(--swap-light);
+    border-left-color: var(--swap);
+  }
+
+  body.swap-mode .week-row.is-selected {
+    background: var(--swap-light) !important;
+    border-left: 3px solid var(--swap) !important;
+    padding-left: 16px;
+    margin-left: -16px;
+  }
+
+  body.swap-mode .week-row.is-past {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+
+  .wk-num {
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .wk-date {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .wk-date .dow {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .wk-person {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+
+  .wk-tag {
+    font-family: 'Bodoni Moda', serif;
+    font-size: 10px;
+    font-style: italic;
+    letter-spacing: 0.15em;
+    color: var(--paper);
+    padding: 4px 10px;
+    background: var(--ink);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .week-row.is-current .wk-tag { background: var(--accent); }
+  .week-row.is-swapped .wk-tag { background: var(--swap); }
+
+  .wk-badge {
+    font-size: 10px;
+    color: var(--swap);
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    display: none;
+  }
+
+  .week-row.is-swapped .wk-badge { display: inline; }
+
+  .action-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 56px;
+    padding-top: 32px;
+    border-top: 2px solid var(--line);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 14px 24px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--ink);
+  }
+
+  .btn.small {
+    padding: 8px 16px;
+    font-size: 11px;
+  }
+
+  .btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+    transform: translateY(-1px);
+  }
+
+  .btn.primary {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+  }
+
+  .btn.primary:hover {
+    background: var(--accent-deep);
+    border-color: var(--accent-deep);
+  }
+
+  .btn.swap {
+    background: var(--swap);
+    color: var(--paper);
+    border-color: var(--swap);
+  }
+
+  .btn.swap:hover {
+    background: #1b4332;
+    border-color: #1b4332;
+  }
+
+  .btn.ghost {
+    background: transparent;
+    color: var(--muted);
+    border-color: var(--muted);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px 28px;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    transition: transform 0.3s ease;
+    z-index: 100;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.swap { background: var(--swap); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Bodoni Moda', serif;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(26,24,20,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+
+  .modal-backdrop.show { display: flex; }
+
+  .modal {
+    background: var(--paper);
+    border: 2px solid var(--line);
+    padding: 32px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+
+  .modal h3 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 20px;
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
+  }
+
+  .modal .swap-preview {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--paper-deep);
+    border: 1px dashed var(--line);
+  }
+
+  .modal .swap-preview .item {
+    text-align: center;
+  }
+
+  .modal .swap-preview .item .d {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .modal .swap-preview .item .p {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .modal .swap-preview .arr {
+    color: var(--accent);
+    font-size: 24px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 720px) {
+    .wrapper { padding: 24px 20px 60px; }
+    header { grid-template-columns: 1fr; }
+    .meta { text-align: left; }
+    .today {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 28px 24px;
+    }
+    .today .label {
+      writing-mode: horizontal-tb;
+      height: auto;
+      border-left: none;
+      border-bottom: 1px solid var(--gold);
+      padding: 0 0 8px;
+      display: inline-block;
+    }
+    .today .position { text-align: left; }
+    .rotation { grid-template-columns: 1fr; gap: 16px; }
+    .rotation .hed {
+      writing-mode: horizontal-tb;
+      border-left: none;
+      border-bottom: 2px solid var(--accent);
+      padding: 0 0 4px;
+      display: inline-block;
+      align-self: start;
+    }
+    .rotation-list { gap: 6px; }
+    .rot-item { padding: 14px 4px; }
+    .rot-item .nm { font-size: 15px; }
+    .rot-item .arrow { display: none; }
+    .swap-panel { grid-template-columns: 1fr; }
+    .month-group { grid-template-columns: 1fr; gap: 16px; padding: 20px 0; }
+    .month-label {
+      position: static;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    .month-label .num { font-size: 40px; }
+    .month-label .jp {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+      border-left: 1px solid var(--soft);
+      padding-left: 16px;
+    }
+    .week-row {
+      grid-template-columns: 70px 1fr auto;
+      gap: 12px;
+    }
+    .wk-num { display: none; }
+    .wk-tag { display: none; }
+    .wk-person { font-size: 18px; }
+  }
+
+  @media print {
+    body { background: white; }
+    body::before { display: none; }
+    .controls, .action-row, footer, .toast, .swap-panel, .history-section { display: none; }
+    .wrapper { max-width: 100%; padding: 20px; }
+    .today { background: white; color: black; border: 2px solid black; }
+    .today .label, .today .person .when, .today .position .txt { color: #555; }
+    .today .person .name, .today .position .num { color: black; }
+    .week-row { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="masthead">
+      <div class="kicker">— Weekly Rota, Since 2026 —</div>
+      <h1>ゴミ捨て当番<span class="dot">・</span>週報</h1>
+    </div>
+    <div class="meta">
+      <div class="vol">VOL. 01 / FY2026</div>
+      <div>2026.4.27 — 2027.3.29</div>
+    </div>
+  </header>
+
+  <div class="sub-bar">
+    <span>五人による週替わり輪番</span>
+    <span>Okuda × Hashimoto × Terui × Miyaoka × Ide</span>
+  </div>
+
+  <section class="today">
+    <div class="label">This Week</div>
+    <div class="person">
+      <div class="name" id="todayName">—</div>
+      <div class="when" id="todayWhen">—</div>
+    </div>
+    <div class="position">
+      <div class="num" id="todayNum">—</div>
+      <div class="txt">of five</div>
+    </div>
+  </section>
+
+  <section class="rotation">
+    <div class="hed">輪番順</div>
+    <div class="rotation-list" id="rotationList"></div>
+  </section>
+
+  <!-- SWAP PANEL -->
+  <div class="swap-panel" id="swapPanel">
+    <div class="swap-info">
+      <div class="title" id="swapTitle">🔄 当番を交換する</div>
+      <div class="desc" id="swapDesc">「交換モード」をONにして、入れ替えたい2つの週をタップしてください</div>
+    </div>
+    <div class="swap-actions">
+      <button class="btn swap small" id="swapToggle">交換モードON</button>
+      <button class="btn ghost small" id="swapCancel" style="display:none;">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section" id="historySection" style="display:none;">
+    <h3>交換履歴</h3>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <div class="controls">
+    <div class="section-hed">年間スケジュール</div>
+    <div class="filter-group" id="filters">
+      <button class="filter active" data-f="all">全員</button>
+      <button class="filter" data-f="奥田">奥田</button>
+      <button class="filter" data-f="橋本">橋本</button>
+      <button class="filter" data-f="照井">照井</button>
+      <button class="filter" data-f="宮岡">宮岡</button>
+      <button class="filter" data-f="井手">井手</button>
+    </div>
+  </div>
+
+  <section class="schedule" id="schedule"></section>
+
+  <div class="action-row">
+    <button class="btn primary" id="copyWeek">今週分をコピー</button>
+    <button class="btn" id="copyAll">全期間をコピー</button>
+    <button class="btn" id="exportState">状態を保存(.json)</button>
+    <button class="btn" id="importState">状態を読込</button>
+    <button class="btn" id="resetState">リセット</button>
+    <button class="btn" id="printBtn">印刷</button>
+  </div>
+
+  <footer>
+    <span>— End of Roster —</span>
+    <span>Singerly Internal Use</span>
+  </footer>
+
+</div>
+
+<div class="toast" id="toast">コピーしました</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h3 id="modalTitle">この2つを入れ替えますか？</h3>
+    <div class="swap-preview" id="modalPreview"></div>
+    <div class="modal-actions">
+      <button class="btn ghost small" id="modalCancel">キャンセル</button>
+      <button class="btn swap small" id="modalConfirm">入れ替える</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="fileInput" accept=".json" style="display:none;">
+
+<script>
+  // === Configuration ===
+  const MEMBERS = ['奥田', '橋本', '照井', '宮岡', '井手'];
+  const START_DATE = new Date(2026, 3, 27);
+  const END_DATE = new Date(2027, 2, 29);
+
+  // === State ===
+  // schedule is the single source of truth.
+  // Each week has: { date, person, weekNo, originalPerson, swapped }
+  let schedule = [];
+  let history = []; // {from: {idx, person}, to: {idx, person}, timestamp}
+  let swapMode = false;
+  let selectedIndices = [];
+
+  function generateSchedule() {
+    const weeks = [];
+    let cur = new Date(START_DATE);
+    let idx = 0;
+    let weekCounter = 1;
+    while (cur <= END_DATE) {
+      const person = MEMBERS[idx % MEMBERS.length];
+      weeks.push({
+        date: new Date(cur),
+        person: person,
+        originalPerson: person,
+        weekNo: weekCounter,
+        swapped: false
+      });
+      cur.setDate(cur.getDate() + 7);
+      idx++;
+      weekCounter++;
+    }
+    return weeks;
+  }
+
+  schedule = generateSchedule();
+
+  // === Helpers ===
+  const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+
+  function fmtDate(d) {
+    return `${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+
+  function fmtDateFull(d) {
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）`;
+  }
+
+  function getWeekRange(d) {
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    return `${fmtDate(d)} 〜 ${fmtDate(end)}`;
+  }
+
+  function findCurrentWeekIndex() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < schedule.length; i++) {
+      const wkStart = new Date(schedule[i].date);
+      const wkEnd = new Date(wkStart);
+      wkEnd.setDate(wkEnd.getDate() + 6);
+      if (today >= wkStart && today <= wkEnd) return i;
+      if (today < wkStart) return i;
+    }
+    return schedule.length - 1;
+  }
+
+  let currentIdx = findCurrentWeekIndex();
+
+  // === Render Today Banner ===
+  function renderTodayBanner() {
+    const currentWeek = schedule[currentIdx];
+    document.getElementById('todayName').textContent = currentWeek.person;
+    document.getElementById('todayWhen').textContent = getWeekRange(currentWeek.date);
+    document.getElementById('todayNum').textContent =
+      String(MEMBERS.indexOf(currentWeek.person) + 1).padStart(2, '0');
+  }
+
+  // === Render Rotation (based on original order) ===
+  function renderRotation() {
+    const rotationList = document.getElementById('rotationList');
+    rotationList.innerHTML = '';
+    const currentPerson = schedule[currentIdx].person;
+    MEMBERS.forEach((name, i) => {
+      const div = document.createElement('div');
+      div.className = 'rot-item' + (name === currentPerson ? ' is-active' : '');
+      div.innerHTML = `
+        <div class="order">No. ${String(i + 1).padStart(2, '0')}</div>
+        <div class="nm">${name}</div>
+        ${i < MEMBERS.length - 1 ? '<div class="arrow">→</div>' : '<div class="arrow">↻</div>'}
+      `;
+      rotationList.appendChild(div);
+    });
+  }
+
+  // === Render Schedule ===
+  let activeFilter = 'all';
+
+  function renderSchedule() {
+    const container = document.getElementById('schedule');
+    container.innerHTML = '';
+
+    const byMonth = {};
+    schedule.forEach((wk, i) => {
+      if (activeFilter !== 'all' && wk.person !== activeFilter) return;
+      const key = `${wk.date.getFullYear()}-${wk.date.getMonth()}`;
+      if (!byMonth[key]) byMonth[key] = { year: wk.date.getFullYear(), month: wk.date.getMonth(), weeks: [] };
+      byMonth[key].weeks.push({ ...wk, idx: i });
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const jpMonths = ['睦月', '如月', '弥生', '卯月', '皐月', '水無月',
+                      '文月', '葉月', '長月', '神無月', '霜月', '師走'];
+
+    Object.values(byMonth).forEach(group => {
+      const mg = document.createElement('div');
+      mg.className = 'month-group';
+
+      const label = document.createElement('div');
+      label.className = 'month-label';
+      label.innerHTML = `
+        <div>
+          <div class="num">${String(group.month + 1).padStart(2, '0')}</div>
+          <div class="yr">${group.year}</div>
+        </div>
+        <div class="jp">${jpMonths[group.month]}</div>
+      `;
+      mg.appendChild(label);
+
+      const weeksDiv = document.createElement('div');
+      weeksDiv.className = 'weeks';
+
+      group.weeks.forEach(wk => {
+        const wkEnd = new Date(wk.date);
+        wkEnd.setDate(wkEnd.getDate() + 6);
+        const isPast = wkEnd < today;
+        const isCurrent = wk.idx === currentIdx;
+        const isSelected = selectedIndices.includes(wk.idx);
+
+        const row = document.createElement('div');
+        let cls = 'week-row';
+        if (isCurrent) cls += ' is-current';
+        if (isPast && !isCurrent) cls += ' is-past';
+        if (wk.swapped) cls += ' is-swapped';
+        if (isSelected) cls += ' is-selected';
+        row.className = cls;
+        row.dataset.idx = wk.idx;
+
+        const tagText = isCurrent ? 'Current' : (isPast ? 'Past' : 'Upcoming');
+        const swappedBadge = wk.swapped ? `<span class="wk-badge">↔ swapped</span>` : '';
+
+        row.innerHTML = `
+          <div class="wk-num">Week ${String(wk.weekNo).padStart(2, '0')}</div>
+          <div class="wk-date">${fmtDate(wk.date)}<span class="dow">月曜〜</span></div>
+          <div class="wk-person">${wk.person} ${swappedBadge}</div>
+          <div class="wk-tag">${tagText}</div>
+        `;
+
+        row.addEventListener('click', () => handleWeekClick(wk.idx, isPast));
+
+        weeksDiv.appendChild(row);
+      });
+
+      mg.appendChild(weeksDiv);
+      container.appendChild(mg);
+    });
+  }
+
+  // === Swap Logic ===
+  function handleWeekClick(idx, isPast) {
+    if (!swapMode) return;
+    if (isPast) {
+      showToast('過去の週は交換できません', false);
+      return;
+    }
+
+    const i = selectedIndices.indexOf(idx);
+    if (i >= 0) {
+      selectedIndices.splice(i, 1);
+    } else {
+      selectedIndices.push(idx);
+      if (selectedIndices.length === 2) {
+        openSwapModal();
+        return;
+      }
+    }
+    updateSwapPanel();
+    renderSchedule();
+  }
+
+  function openSwapModal() {
+    const [a, b] = selectedIndices;
+    const wkA = schedule[a];
+    const wkB = schedule[b];
+    document.getElementById('modalPreview').innerHTML = `
+      <div class="item">
+        <div class="d">${fmtDate(wkA.date)} 週</div>
+        <div class="p">${wkA.person}</div>
+      </div>
+      <div class="arr">⇌</div>
+      <div class="item">
+        <div class="d">${fmtDate(wkB.date)} 週</div>
+        <div class="p">${wkB.person}</div>
+      </div>
+    `;
+    document.getElementById('modalBackdrop').classList.add('show');
+  }
+
+  function executeSwap() {
+    const [a, b] = selectedIndices;
+    const wkA = schedule[a];
+    const wkB = schedule[b];
+    const fromA = wkA.person;
+    const fromB = wkB.person;
+
+    // swap
+    const tmp = wkA.person;
+    wkA.person = wkB.person;
+    wkB.person = tmp;
+
+    // mark swapped (if person != original)
+    wkA.swapped = wkA.person !== wkA.originalPerson;
+    wkB.swapped = wkB.person !== wkB.originalPerson;
+
+    // history
+    history.unshift({
+      from: { date: new Date(wkA.date), person: fromA },
+      to: { date: new Date(wkB.date), person: fromB },
+      timestamp: new Date()
+    });
+
+    selectedIndices = [];
+    document.getElementById('modalBackdrop').classList.remove('show');
+    renderAll();
+    showToast(`${fmtDate(wkA.date)}週 と ${fmtDate(wkB.date)}週 を交換しました`, true);
+  }
+
+  function cancelModal() {
+    document.getElementById('modalBackdrop').classList.remove('show');
+    selectedIndices = [];
+    updateSwapPanel();
+    renderSchedule();
+  }
+
+  function toggleSwapMode() {
+    swapMode = !swapMode;
+    document.body.classList.toggle('swap-mode', swapMode);
+    selectedIndices = [];
+    document.getElementById('swapPanel').classList.toggle('is-active', swapMode);
+    document.getElementById('swapToggle').textContent = swapMode ? '交換モードOFF' : '交換モードON';
+    document.getElementById('swapCancel').style.display = swapMode ? 'inline-block' : 'none';
+    updateSwapPanel();
+    renderSchedule();
+  }
+
+  function updateSwapPanel() {
+    const title = document.getElementById('swapTitle');
+    const desc = document.getElementById('swapDesc');
+    if (!swapMode) {
+      title.textContent = '🔄 当番を交換する';
+      desc.textContent = '「交換モード」をONにして、入れ替えたい2つの週をタップしてください';
+    } else if (selectedIndices.length === 0) {
+      title.textContent = '🔄 交換モード：1つ目を選択してください';
+      desc.textContent = '入れ替えたい週の行をタップ';
+    } else if (selectedIndices.length === 1) {
+      const wk = schedule[selectedIndices[0]];
+      title.textContent = `🔄 ${fmtDate(wk.date)} (${wk.person}) を選択中`;
+      desc.textContent = '入れ替え先の週をタップしてください';
+    }
+  }
+
+  // === History ===
+  function renderHistory() {
+    const section = document.getElementById('historySection');
+    const list = document.getElementById('historyList');
+    if (history.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    list.innerHTML = history.slice(0, 5).map(h => {
+      const t = new Date(h.timestamp);
+      const timeStr = `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+      return `<div class="history-item">
+        <span>${fmtDate(new Date(h.from.date))}(${h.from.person}) ⇌ ${fmtDate(new Date(h.to.date))}(${h.to.person})</span>
+        <span class="meta-time">${timeStr}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderAll() {
+    renderTodayBanner();
+    renderRotation();
+    renderSchedule();
+    renderHistory();
+  }
+
+  // === Filters ===
+  document.getElementById('filters').addEventListener('click', (e) => {
+    if (!e.target.matches('.filter')) return;
+    document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    activeFilter = e.target.dataset.f;
+    renderSchedule();
+  });
+
+  // === Toast ===
+  function showToast(msg, isSwap = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('swap', isSwap);
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('コピーしました'),
+      () => showToast('コピーに失敗しました')
+    );
+  }
+
+  // === Buttons ===
+  document.getElementById('swapToggle').addEventListener('click', toggleSwapMode);
+  document.getElementById('swapCancel').addEventListener('click', toggleSwapMode);
+  document.getElementById('modalConfirm').addEventListener('click', executeSwap);
+  document.getElementById('modalCancel').addEventListener('click', cancelModal);
+  document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'modalBackdrop') cancelModal();
+  });
+
+  document.getElementById('copyWeek').addEventListener('click', () => {
+    const wk = schedule[currentIdx];
+    const end = new Date(wk.date); end.setDate(end.getDate() + 6);
+    const text = `📣 今週のゴミ捨て当番\n\n${fmtDateFull(wk.date)} 〜 ${fmtDate(end)}\n担当：${wk.person} さん\n\nよろしくお願いします！`;
+    copyToClipboard(text);
+  });
+
+  document.getElementById('copyAll').addEventListener('click', () => {
+    const lines = schedule.map(wk => {
+      const end = new Date(wk.date); end.setDate(end.getDate() + 6);
+      const marker = wk.swapped ? ' ※交換済' : '';
+      return `${fmtDate(wk.date)}〜${fmtDate(end)}　${wk.person}${marker}`;
+    });
+    copyToClipboard('■ ゴミ捨て当番カレンダー (2026.4.27〜2027.3.29)\n\n' + lines.join('\n'));
+  });
+
+  // === Export / Import ===
+  document.getElementById('exportState').addEventListener('click', () => {
+    const state = {
+      version: 1,
+      schedule: schedule.map(wk => ({
+        date: wk.date.toISOString(),
+        person: wk.person,
+        originalPerson: wk.originalPerson,
+        weekNo: wk.weekNo,
+        swapped: wk.swapped
+      })),
+      history: history.map(h => ({
+        from: { date: h.from.date.toISOString(), person: h.from.person },
+        to: { date: h.to.date.toISOString(), person: h.to.person },
+        timestamp: h.timestamp.toISOString()
+      })),
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gomi-touban-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('状態を保存しました');
+  });
+
+  document.getElementById('importState').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const state = JSON.parse(ev.target.result);
+        if (!state.schedule) throw new Error('Invalid file');
+        schedule = state.schedule.map(wk => ({
+          date: new Date(wk.date),
+          person: wk.person,
+          originalPerson: wk.originalPerson,
+          weekNo: wk.weekNo,
+          swapped: wk.swapped || false
+        }));
+        history = (state.history || []).map(h => ({
+          from: { date: new Date(h.from.date), person: h.from.person },
+          to: { date: new Date(h.to.date), person: h.to.person },
+          timestamp: new Date(h.timestamp)
+        }));
+        currentIdx = findCurrentWeekIndex();
+        renderAll();
+        showToast('状態を読み込みました', true);
+      } catch (err) {
+        showToast('ファイルの読み込みに失敗しました');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('resetState').addEventListener('click', () => {
+    if (!confirm('全ての交換をリセットして初期状態に戻しますか？')) return;
+    schedule = generateSchedule();
+    history = [];
+    selectedIndices = [];
+    if (swapMode) toggleSwapMode();
+    renderAll();
+    showToast('リセットしました');
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  // Initial render
+  renderAll();
+</script>
+</body>
+</html>

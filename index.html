@@ -20,6 +20,8 @@
     --soft: #ddd4c0;
     --swap: #2d6a4f;
     --swap-light: #d8f3dc;
+    --skip: #7c6b99;
+    --skip-light: #ede9f7;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -197,6 +199,22 @@
     margin-top: 4px;
   }
 
+  .today.is-skipped .person .name {
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+
+  .today-skip-notice {
+    display: none;
+    font-size: 14px;
+    color: var(--skip-light);
+    margin-top: 8px;
+    letter-spacing: 0.1em;
+    font-style: italic;
+  }
+
+  .today.is-skipped .today-skip-notice { display: block; }
+
   .rotation {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -272,12 +290,12 @@
   .rot-item.is-active .order,
   .rot-item.is-active .nm { color: var(--paper); }
 
-  /* SWAP MODE PANEL */
+  /* ---- MODE PANELS ---- */
   .swap-panel {
     background: var(--paper-deep);
     border: 2px solid var(--line);
     padding: 20px 24px;
-    margin-bottom: 32px;
+    margin-bottom: 12px;
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
@@ -287,6 +305,12 @@
   .swap-panel.is-active {
     background: var(--swap-light);
     border-color: var(--swap);
+    border-style: dashed;
+  }
+
+  .swap-panel.is-skip-active {
+    background: var(--skip-light);
+    border-color: var(--skip);
     border-style: dashed;
   }
 
@@ -303,9 +327,8 @@
     letter-spacing: 0.05em;
   }
 
-  .swap-panel.is-active .swap-info .title {
-    color: var(--swap);
-  }
+  .swap-panel.is-active .swap-info .title { color: var(--swap); }
+  .swap-panel.is-skip-active .swap-info .title { color: var(--skip); }
 
   .swap-actions { display: flex; gap: 8px; }
 
@@ -455,6 +478,15 @@
     background: linear-gradient(90deg, rgba(45,106,79,0.08) 0%, transparent 100%);
   }
 
+  .week-row.is-skipped {
+    background: linear-gradient(90deg, rgba(124,107,153,0.08) 0%, transparent 100%);
+  }
+
+  .week-row.is-skipped .wk-person {
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
+
   /* Swap mode states */
   body.swap-mode .week-row:not(.is-past) {
     cursor: pointer;
@@ -476,6 +508,31 @@
   }
 
   body.swap-mode .week-row.is-past {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+
+  /* Skip mode states */
+  body.skip-mode .week-row:not(.is-past) {
+    cursor: pointer;
+    padding-left: 16px;
+    margin-left: -16px;
+    border-left: 3px solid transparent;
+  }
+
+  body.skip-mode .week-row:not(.is-past):hover {
+    background: var(--skip-light);
+    border-left-color: var(--skip);
+  }
+
+  body.skip-mode .week-row.is-skipped:not(.is-past) {
+    background: var(--skip-light) !important;
+    border-left: 3px solid var(--skip) !important;
+    padding-left: 16px;
+    margin-left: -16px;
+  }
+
+  body.skip-mode .week-row.is-past {
     opacity: 0.25;
     cursor: not-allowed;
   }
@@ -523,6 +580,7 @@
 
   .week-row.is-current .wk-tag { background: var(--accent); }
   .week-row.is-swapped .wk-tag { background: var(--swap); }
+  .week-row.is-skipped .wk-tag { background: var(--skip); }
 
   .wk-badge {
     font-size: 10px;
@@ -534,6 +592,17 @@
   }
 
   .week-row.is-swapped .wk-badge { display: inline; }
+
+  .wk-badge-skip {
+    font-size: 10px;
+    color: var(--skip);
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    display: none;
+  }
+
+  .week-row.is-skipped .wk-badge-skip { display: inline; }
 
   .action-row {
     display: flex;
@@ -591,6 +660,17 @@
     border-color: #1b4332;
   }
 
+  .btn.skip-btn {
+    background: var(--skip);
+    color: var(--paper);
+    border-color: var(--skip);
+  }
+
+  .btn.skip-btn:hover {
+    background: #5a4a75;
+    border-color: #5a4a75;
+  }
+
   .btn.ghost {
     background: transparent;
     color: var(--muted);
@@ -615,6 +695,7 @@
 
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.swap { background: var(--swap); }
+  .toast.skip { background: var(--skip); }
 
   footer {
     margin-top: 64px;
@@ -757,7 +838,7 @@
   @media print {
     body { background: white; }
     body::before { display: none; }
-    .controls, .action-row, footer, .toast, .swap-panel, .history-section { display: none; }
+    .controls, .action-row, footer, .toast, .swap-panel, .skip-panel, .history-section { display: none; }
     .wrapper { max-width: 100%; padding: 20px; }
     .today { background: white; color: black; border: 2px solid black; }
     .today .label, .today .person .when, .today .position .txt { color: #555; }
@@ -785,11 +866,12 @@
     <span>Okuda × Hashimoto × Terui × Miyaoka × Ide</span>
   </div>
 
-  <section class="today">
+  <section class="today" id="todaySection">
     <div class="label">This Week</div>
     <div class="person">
       <div class="name" id="todayName">—</div>
       <div class="when" id="todayWhen">—</div>
+      <div class="today-skip-notice">この週はお休みです</div>
     </div>
     <div class="position">
       <div class="num" id="todayNum">—</div>
@@ -811,6 +893,18 @@
     <div class="swap-actions">
       <button class="btn swap small" id="swapToggle">交換モードON</button>
       <button class="btn ghost small" id="swapCancel" style="display:none;">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- SKIP PANEL -->
+  <div class="swap-panel" id="skipPanel">
+    <div class="swap-info">
+      <div class="title" id="skipTitle">🗓 週をスキップする</div>
+      <div class="desc" id="skipDesc">「スキップモード」をONにして、お休みにしたい週をタップ（もう一度タップで解除）</div>
+    </div>
+    <div class="swap-actions">
+      <button class="btn skip-btn small" id="skipToggle">スキップモードON</button>
+      <button class="btn ghost small" id="skipCancel" style="display:none;">キャンセル</button>
     </div>
   </div>
 
@@ -872,13 +966,13 @@
   const MEMBERS = ['奥田', '橋本', '照井', '宮岡', '井手'];
   const START_DATE = new Date(2026, 3, 27);
   const END_DATE = new Date(2027, 2, 29);
+  const STORAGE_KEY = 'gomi-calendar-state-v1';
 
   // === State ===
-  // schedule is the single source of truth.
-  // Each week has: { date, person, weekNo, originalPerson, swapped }
   let schedule = [];
-  let history = []; // {from: {idx, person}, to: {idx, person}, timestamp}
+  let history = [];
   let swapMode = false;
+  let skipMode = false;
   let selectedIndices = [];
 
   function generateSchedule() {
@@ -893,7 +987,8 @@
         person: person,
         originalPerson: person,
         weekNo: weekCounter,
-        swapped: false
+        swapped: false,
+        skipped: false
       });
       cur.setDate(cur.getDate() + 7);
       idx++;
@@ -902,7 +997,59 @@
     return weeks;
   }
 
-  schedule = generateSchedule();
+  // === localStorage ===
+  function saveState() {
+    try {
+      const state = {
+        version: 2,
+        schedule: schedule.map(wk => ({
+          date: wk.date.toISOString(),
+          person: wk.person,
+          originalPerson: wk.originalPerson,
+          weekNo: wk.weekNo,
+          swapped: wk.swapped,
+          skipped: wk.skipped || false
+        })),
+        history: history.map(h => ({
+          from: { date: h.from.date.toISOString(), person: h.from.person },
+          to: { date: h.to.date.toISOString(), person: h.to.person },
+          timestamp: h.timestamp.toISOString()
+        })),
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch(e) {}
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const state = JSON.parse(raw);
+      if (!state.schedule) return false;
+      schedule = state.schedule.map(wk => ({
+        date: new Date(wk.date),
+        person: wk.person,
+        originalPerson: wk.originalPerson,
+        weekNo: wk.weekNo,
+        swapped: wk.swapped || false,
+        skipped: wk.skipped || false
+      }));
+      history = (state.history || []).map(h => ({
+        from: { date: new Date(h.from.date), person: h.from.person },
+        to: { date: new Date(h.to.date), person: h.to.person },
+        timestamp: new Date(h.timestamp)
+      }));
+      return true;
+    } catch(e) {
+      return false;
+    }
+  }
+
+  // Initialize
+  if (!loadState()) {
+    schedule = generateSchedule();
+  }
 
   // === Helpers ===
   const DOW = ['日', '月', '火', '水', '木', '金', '土'];
@@ -939,13 +1086,15 @@
   // === Render Today Banner ===
   function renderTodayBanner() {
     const currentWeek = schedule[currentIdx];
+    const section = document.getElementById('todaySection');
     document.getElementById('todayName').textContent = currentWeek.person;
     document.getElementById('todayWhen').textContent = getWeekRange(currentWeek.date);
     document.getElementById('todayNum').textContent =
       String(MEMBERS.indexOf(currentWeek.person) + 1).padStart(2, '0');
+    section.classList.toggle('is-skipped', !!currentWeek.skipped);
   }
 
-  // === Render Rotation (based on original order) ===
+  // === Render Rotation ===
   function renderRotation() {
     const rotationList = document.getElementById('rotationList');
     rotationList.innerHTML = '';
@@ -1013,17 +1162,24 @@
         if (isCurrent) cls += ' is-current';
         if (isPast && !isCurrent) cls += ' is-past';
         if (wk.swapped) cls += ' is-swapped';
+        if (wk.skipped) cls += ' is-skipped';
         if (isSelected) cls += ' is-selected';
         row.className = cls;
         row.dataset.idx = wk.idx;
 
-        const tagText = isCurrent ? 'Current' : (isPast ? 'Past' : 'Upcoming');
+        let tagText;
+        if (wk.skipped) tagText = 'Skip';
+        else if (isCurrent) tagText = 'Current';
+        else if (isPast) tagText = 'Past';
+        else tagText = 'Upcoming';
+
         const swappedBadge = wk.swapped ? `<span class="wk-badge">↔ swapped</span>` : '';
+        const skippedBadge = wk.skipped ? `<span class="wk-badge-skip">✕ お休み</span>` : '';
 
         row.innerHTML = `
           <div class="wk-num">Week ${String(wk.weekNo).padStart(2, '0')}</div>
           <div class="wk-date">${fmtDate(wk.date)}<span class="dow">月曜〜</span></div>
-          <div class="wk-person">${wk.person} ${swappedBadge}</div>
+          <div class="wk-person">${wk.person} ${swappedBadge}${skippedBadge}</div>
           <div class="wk-tag">${tagText}</div>
         `;
 
@@ -1037,11 +1193,29 @@
     });
   }
 
-  // === Swap Logic ===
+  // === Click Handler (Swap / Skip / None) ===
   function handleWeekClick(idx, isPast) {
+    // Skip mode
+    if (skipMode) {
+      if (isPast) {
+        showToast('過去の週はスキップできません', 'none');
+        return;
+      }
+      schedule[idx].skipped = !schedule[idx].skipped;
+      saveState();
+      renderAll();
+      const wk = schedule[idx];
+      const msg = wk.skipped
+        ? `${fmtDate(wk.date)}週 をお休みにしました`
+        : `${fmtDate(wk.date)}週 のお休みを解除しました`;
+      showToast(msg, 'skip');
+      return;
+    }
+
+    // Swap mode
     if (!swapMode) return;
     if (isPast) {
-      showToast('過去の週は交換できません', false);
+      showToast('過去の週は交換できません', 'none');
       return;
     }
 
@@ -1059,6 +1233,7 @@
     renderSchedule();
   }
 
+  // === Swap Logic ===
   function openSwapModal() {
     const [a, b] = selectedIndices;
     const wkA = schedule[a];
@@ -1084,16 +1259,13 @@
     const fromA = wkA.person;
     const fromB = wkB.person;
 
-    // swap
     const tmp = wkA.person;
     wkA.person = wkB.person;
     wkB.person = tmp;
 
-    // mark swapped (if person != original)
     wkA.swapped = wkA.person !== wkA.originalPerson;
     wkB.swapped = wkB.person !== wkB.originalPerson;
 
-    // history
     history.unshift({
       from: { date: new Date(wkA.date), person: fromA },
       to: { date: new Date(wkB.date), person: fromB },
@@ -1102,8 +1274,9 @@
 
     selectedIndices = [];
     document.getElementById('modalBackdrop').classList.remove('show');
+    saveState();
     renderAll();
-    showToast(`${fmtDate(wkA.date)}週 と ${fmtDate(wkB.date)}週 を交換しました`, true);
+    showToast(`${fmtDate(wkA.date)}週 と ${fmtDate(wkB.date)}週 を交換しました`, 'swap');
   }
 
   function cancelModal() {
@@ -1114,6 +1287,9 @@
   }
 
   function toggleSwapMode() {
+    // Turn off skip mode if active
+    if (skipMode) turnOffSkipMode();
+
     swapMode = !swapMode;
     document.body.classList.toggle('swap-mode', swapMode);
     selectedIndices = [];
@@ -1137,6 +1313,41 @@
       const wk = schedule[selectedIndices[0]];
       title.textContent = `🔄 ${fmtDate(wk.date)} (${wk.person}) を選択中`;
       desc.textContent = '入れ替え先の週をタップしてください';
+    }
+  }
+
+  // === Skip Logic ===
+  function toggleSkipMode() {
+    // Turn off swap mode if active
+    if (swapMode) toggleSwapMode();
+
+    skipMode = !skipMode;
+    document.body.classList.toggle('skip-mode', skipMode);
+    document.getElementById('skipPanel').classList.toggle('is-skip-active', skipMode);
+    document.getElementById('skipToggle').textContent = skipMode ? 'スキップモードOFF' : 'スキップモードON';
+    document.getElementById('skipCancel').style.display = skipMode ? 'inline-block' : 'none';
+    updateSkipPanel();
+    renderSchedule();
+  }
+
+  function turnOffSkipMode() {
+    skipMode = false;
+    document.body.classList.remove('skip-mode');
+    document.getElementById('skipPanel').classList.remove('is-skip-active');
+    document.getElementById('skipToggle').textContent = 'スキップモードON';
+    document.getElementById('skipCancel').style.display = 'none';
+    updateSkipPanel();
+  }
+
+  function updateSkipPanel() {
+    const title = document.getElementById('skipTitle');
+    const desc = document.getElementById('skipDesc');
+    if (!skipMode) {
+      title.textContent = '🗓 週をスキップする';
+      desc.textContent = '「スキップモード」をONにして、お休みにしたい週をタップ（もう一度タップで解除）';
+    } else {
+      title.textContent = '🗓 スキップモード：お休みにする週をタップ';
+      desc.textContent = 'タップした週を「お休み」にします。もう一度タップすると解除できます';
     }
   }
 
@@ -1176,10 +1387,12 @@
   });
 
   // === Toast ===
-  function showToast(msg, isSwap = false) {
+  function showToast(msg, type = 'none') {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.classList.toggle('swap', isSwap);
+    t.classList.remove('swap', 'skip');
+    if (type === 'swap') t.classList.add('swap');
+    if (type === 'skip') t.classList.add('skip');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
   }
@@ -1194,6 +1407,8 @@
   // === Buttons ===
   document.getElementById('swapToggle').addEventListener('click', toggleSwapMode);
   document.getElementById('swapCancel').addEventListener('click', toggleSwapMode);
+  document.getElementById('skipToggle').addEventListener('click', toggleSkipMode);
+  document.getElementById('skipCancel').addEventListener('click', toggleSkipMode);
   document.getElementById('modalConfirm').addEventListener('click', executeSwap);
   document.getElementById('modalCancel').addEventListener('click', cancelModal);
   document.getElementById('modalBackdrop').addEventListener('click', (e) => {
@@ -1203,15 +1418,17 @@
   document.getElementById('copyWeek').addEventListener('click', () => {
     const wk = schedule[currentIdx];
     const end = new Date(wk.date); end.setDate(end.getDate() + 6);
-    const text = `📣 今週のゴミ捨て当番\n\n${fmtDateFull(wk.date)} 〜 ${fmtDate(end)}\n担当：${wk.person} さん\n\nよろしくお願いします！`;
+    const skipNote = wk.skipped ? '\n⚠️ この週はお休みです' : '';
+    const text = `📣 今週のゴミ捨て当番\n\n${fmtDateFull(wk.date)} 〜 ${fmtDate(end)}\n担当：${wk.person} さん${skipNote}\n\nよろしくお願いします！`;
     copyToClipboard(text);
   });
 
   document.getElementById('copyAll').addEventListener('click', () => {
     const lines = schedule.map(wk => {
       const end = new Date(wk.date); end.setDate(end.getDate() + 6);
-      const marker = wk.swapped ? ' ※交換済' : '';
-      return `${fmtDate(wk.date)}〜${fmtDate(end)}　${wk.person}${marker}`;
+      const skipMark = wk.skipped ? ' ※お休み' : '';
+      const swapMark = wk.swapped ? ' ※交換済' : '';
+      return `${fmtDate(wk.date)}〜${fmtDate(end)}　${wk.person}${swapMark}${skipMark}`;
     });
     copyToClipboard('■ ゴミ捨て当番カレンダー (2026.4.27〜2027.3.29)\n\n' + lines.join('\n'));
   });
@@ -1219,13 +1436,14 @@
   // === Export / Import ===
   document.getElementById('exportState').addEventListener('click', () => {
     const state = {
-      version: 1,
+      version: 2,
       schedule: schedule.map(wk => ({
         date: wk.date.toISOString(),
         person: wk.person,
         originalPerson: wk.originalPerson,
         weekNo: wk.weekNo,
-        swapped: wk.swapped
+        swapped: wk.swapped,
+        skipped: wk.skipped || false
       })),
       history: history.map(h => ({
         from: { date: h.from.date.toISOString(), person: h.from.person },
@@ -1261,7 +1479,8 @@
           person: wk.person,
           originalPerson: wk.originalPerson,
           weekNo: wk.weekNo,
-          swapped: wk.swapped || false
+          swapped: wk.swapped || false,
+          skipped: wk.skipped || false
         }));
         history = (state.history || []).map(h => ({
           from: { date: new Date(h.from.date), person: h.from.person },
@@ -1269,8 +1488,9 @@
           timestamp: new Date(h.timestamp)
         }));
         currentIdx = findCurrentWeekIndex();
+        saveState();
         renderAll();
-        showToast('状態を読み込みました', true);
+        showToast('状態を読み込みました', 'swap');
       } catch (err) {
         showToast('ファイルの読み込みに失敗しました');
       }
@@ -1280,11 +1500,13 @@
   });
 
   document.getElementById('resetState').addEventListener('click', () => {
-    if (!confirm('全ての交換をリセットして初期状態に戻しますか？')) return;
+    if (!confirm('全ての交換・スキップをリセットして初期状態に戻しますか？')) return;
     schedule = generateSchedule();
     history = [];
     selectedIndices = [];
     if (swapMode) toggleSwapMode();
+    if (skipMode) toggleSkipMode();
+    saveState();
     renderAll();
     showToast('リセットしました');
   });

@@ -638,6 +638,12 @@
     transform: translateY(-1px);
   }
 
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
   .btn.primary {
     background: var(--accent);
     color: var(--paper);
@@ -694,8 +700,45 @@
   }
 
   .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.swap { background: var(--swap); }
-  .toast.skip { background: var(--skip); }
+  .toast.swap  { background: var(--swap); }
+  .toast.skip  { background: var(--skip); }
+  .toast.error { background: var(--accent-deep); }
+
+  /* ---- Loading Overlay ---- */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(244, 239, 230, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    gap: 16px;
+  }
+
+  .loading-overlay.hidden { display: none; }
+
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--soft);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 
   footer {
     margin-top: 64px;
@@ -751,9 +794,7 @@
     border: 1px dashed var(--line);
   }
 
-  .modal .swap-preview .item {
-    text-align: center;
-  }
+  .modal .swap-preview .item { text-align: center; }
 
   .modal .swap-preview .item .d {
     font-size: 12px;
@@ -848,6 +889,13 @@
 </style>
 </head>
 <body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">読み込み中...</div>
+</div>
+
 <div class="wrapper">
 
   <header>
@@ -931,9 +979,7 @@
   <div class="action-row">
     <button class="btn primary" id="copyWeek">今週分をコピー</button>
     <button class="btn" id="copyAll">全期間をコピー</button>
-    <button class="btn" id="exportState">状態を保存(.json)</button>
-    <button class="btn" id="importState">状態を読込</button>
-    <button class="btn" id="resetState">リセット</button>
+    <button class="btn" id="reloadBtn">再読み込み</button>
     <button class="btn" id="printBtn">印刷</button>
   </div>
 
@@ -958,122 +1004,118 @@
   </div>
 </div>
 
-<!-- Hidden file input for import -->
-<input type="file" id="fileInput" accept=".json" style="display:none;">
-
 <script>
-  // === Configuration ===
-  const MEMBERS = ['奥田', '橋本', '照井', '宮岡', '井手'];
-  const START_DATE = new Date(2026, 3, 27);
-  const END_DATE = new Date(2027, 2, 29);
-  const STORAGE_KEY = 'gomi-calendar-state-v1';
+  // ================================================================
+  // GAS Web App URL — デプロイ後にここを書き換えてください
+  // ================================================================
+  var GAS_URL = 'https://script.google.com/a/macros/singerly.co.jp/s/AKfycbwAxYJMFA80QUedxgng5OlZGK326B1TjB_pR2kl-rVKnZf7x0nerLpDML2kSLGEExkV/exec';
+  // ================================================================
+
+  var MEMBERS = ['奥田', '橋本', '照井', '宮岡', '井手'];
 
   // === State ===
-  let schedule = [];
-  let history = [];
-  let swapMode = false;
-  let skipMode = false;
-  let selectedIndices = [];
+  var schedule = [];
+  var history  = [];
+  var swapMode = false;
+  var skipMode = false;
+  var selectedIndices = [];
 
-  function generateSchedule() {
-    const weeks = [];
-    let cur = new Date(START_DATE);
-    let idx = 0;
-    let weekCounter = 1;
-    while (cur <= END_DATE) {
-      const person = MEMBERS[idx % MEMBERS.length];
-      weeks.push({
-        date: new Date(cur),
-        person: person,
-        originalPerson: person,
-        weekNo: weekCounter,
-        swapped: false,
-        skipped: false
+  // === Loading overlay ===
+  function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || '読み込み中...';
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    setUIDisabled(true);
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    setUIDisabled(false);
+  }
+
+  function setUIDisabled(disabled) {
+    document.querySelectorAll('.btn').forEach(function(b) {
+      b.disabled = disabled;
+    });
+  }
+
+  // === GAS API fetch (GET only) ===
+  function gasGet(params) {
+    var qs = Object.keys(params).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    return fetch(GAS_URL + '?' + qs)
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        if (data.error) throw new Error(data.error);
+        return data;
       });
-      cur.setDate(cur.getDate() + 7);
-      idx++;
-      weekCounter++;
-    }
-    return weeks;
   }
 
-  // === localStorage ===
-  function saveState() {
-    try {
-      const state = {
-        version: 2,
-        schedule: schedule.map(wk => ({
-          date: wk.date.toISOString(),
-          person: wk.person,
-          originalPerson: wk.originalPerson,
-          weekNo: wk.weekNo,
-          swapped: wk.swapped,
-          skipped: wk.skipped || false
-        })),
-        history: history.map(h => ({
-          from: { date: h.from.date.toISOString(), person: h.from.person },
-          to: { date: h.to.date.toISOString(), person: h.to.person },
-          timestamp: h.timestamp.toISOString()
-        })),
-        savedAt: new Date().toISOString()
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch(e) {}
+  // === データ取得 ===
+  function fetchFromGAS() {
+    showLoading('読み込み中...');
+    return gasGet({ action: 'getAll' })
+      .then(function(data) {
+        applyData(data);
+        hideLoading();
+        renderAll();
+      })
+      .catch(function(err) {
+        hideLoading();
+        showToast('データの読み込みに失敗しました: ' + err.message, 'error');
+      });
   }
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
-      const state = JSON.parse(raw);
-      if (!state.schedule) return false;
-      schedule = state.schedule.map(wk => ({
-        date: new Date(wk.date),
-        person: wk.person,
+  function applyData(data) {
+    schedule = data.schedule.map(function(wk) {
+      return {
+        id:             wk.id,
+        weekNo:         wk.weekNo,
+        date:           new Date(wk.date + 'T00:00:00+09:00'),
+        person:         wk.person,
         originalPerson: wk.originalPerson,
-        weekNo: wk.weekNo,
-        swapped: wk.swapped || false,
-        skipped: wk.skipped || false
-      }));
-      history = (state.history || []).map(h => ({
-        from: { date: new Date(h.from.date), person: h.from.person },
-        to: { date: new Date(h.to.date), person: h.to.person },
-        timestamp: new Date(h.timestamp)
-      }));
-      return true;
-    } catch(e) {
-      return false;
-    }
-  }
-
-  // Initialize
-  if (!loadState()) {
-    schedule = generateSchedule();
+        swapped:        wk.swapped,
+        skipped:        wk.skipped
+      };
+    });
+    history = (data.history || []).map(function(h) {
+      return {
+        fromDate:   h.fromDate  ? new Date(h.fromDate  + 'T00:00:00+09:00') : null,
+        fromPerson: h.fromPerson,
+        toDate:     h.toDate    ? new Date(h.toDate    + 'T00:00:00+09:00') : null,
+        toPerson:   h.toPerson,
+        timestamp:  h.timestamp ? new Date(h.timestamp) : null
+      };
+    });
+    currentIdx = findCurrentWeekIndex();
   }
 
   // === Helpers ===
-  const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+  var DOW = ['日', '月', '火', '水', '木', '金', '土'];
 
   function fmtDate(d) {
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
   }
 
   function fmtDateFull(d) {
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）`;
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + DOW[d.getDay()] + '）';
   }
 
   function getWeekRange(d) {
-    const end = new Date(d);
+    var end = new Date(d);
     end.setDate(end.getDate() + 6);
-    return `${fmtDate(d)} 〜 ${fmtDate(end)}`;
+    return fmtDate(d) + ' 〜 ' + fmtDate(end);
   }
 
   function findCurrentWeekIndex() {
-    const today = new Date();
+    var today = new Date();
     today.setHours(0, 0, 0, 0);
-    for (let i = 0; i < schedule.length; i++) {
-      const wkStart = new Date(schedule[i].date);
-      const wkEnd = new Date(wkStart);
+    for (var i = 0; i < schedule.length; i++) {
+      var wkStart = new Date(schedule[i].date);
+      var wkEnd   = new Date(wkStart);
       wkEnd.setDate(wkEnd.getDate() + 6);
       if (today >= wkStart && today <= wkEnd) return i;
       if (today < wkStart) return i;
@@ -1081,109 +1123,107 @@
     return schedule.length - 1;
   }
 
-  let currentIdx = findCurrentWeekIndex();
+  var currentIdx = 0;
 
   // === Render Today Banner ===
   function renderTodayBanner() {
-    const currentWeek = schedule[currentIdx];
-    const section = document.getElementById('todaySection');
-    document.getElementById('todayName').textContent = currentWeek.person;
-    document.getElementById('todayWhen').textContent = getWeekRange(currentWeek.date);
-    document.getElementById('todayNum').textContent =
-      String(MEMBERS.indexOf(currentWeek.person) + 1).padStart(2, '0');
-    section.classList.toggle('is-skipped', !!currentWeek.skipped);
+    var w = schedule[currentIdx];
+    if (!w) return;
+    document.getElementById('todayName').textContent = w.person;
+    document.getElementById('todayWhen').textContent = getWeekRange(w.date);
+    document.getElementById('todayNum').textContent  =
+      String(MEMBERS.indexOf(w.person) + 1).padStart(2, '0');
+    document.getElementById('todaySection').classList.toggle('is-skipped', !!w.skipped);
   }
 
   // === Render Rotation ===
   function renderRotation() {
-    const rotationList = document.getElementById('rotationList');
-    rotationList.innerHTML = '';
-    const currentPerson = schedule[currentIdx].person;
-    MEMBERS.forEach((name, i) => {
-      const div = document.createElement('div');
-      div.className = 'rot-item' + (name === currentPerson ? ' is-active' : '');
-      div.innerHTML = `
-        <div class="order">No. ${String(i + 1).padStart(2, '0')}</div>
-        <div class="nm">${name}</div>
-        ${i < MEMBERS.length - 1 ? '<div class="arrow">→</div>' : '<div class="arrow">↻</div>'}
-      `;
-      rotationList.appendChild(div);
+    var list   = document.getElementById('rotationList');
+    list.innerHTML = '';
+    var current = schedule[currentIdx] ? schedule[currentIdx].person : '';
+    MEMBERS.forEach(function(name, i) {
+      var div = document.createElement('div');
+      div.className = 'rot-item' + (name === current ? ' is-active' : '');
+      div.innerHTML =
+        '<div class="order">No. ' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="nm">' + name + '</div>' +
+        (i < MEMBERS.length - 1 ? '<div class="arrow">→</div>' : '<div class="arrow">↻</div>');
+      list.appendChild(div);
     });
   }
 
   // === Render Schedule ===
-  let activeFilter = 'all';
+  var activeFilter = 'all';
 
   function renderSchedule() {
-    const container = document.getElementById('schedule');
+    var container = document.getElementById('schedule');
     container.innerHTML = '';
 
-    const byMonth = {};
-    schedule.forEach((wk, i) => {
+    var byMonth = {};
+    schedule.forEach(function(wk, i) {
       if (activeFilter !== 'all' && wk.person !== activeFilter) return;
-      const key = `${wk.date.getFullYear()}-${wk.date.getMonth()}`;
+      var key = wk.date.getFullYear() + '-' + wk.date.getMonth();
       if (!byMonth[key]) byMonth[key] = { year: wk.date.getFullYear(), month: wk.date.getMonth(), weeks: [] };
-      byMonth[key].weeks.push({ ...wk, idx: i });
+      byMonth[key].weeks.push(Object.assign({}, wk, { idx: i }));
     });
 
-    const today = new Date();
+    var today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const jpMonths = ['睦月', '如月', '弥生', '卯月', '皐月', '水無月',
-                      '文月', '葉月', '長月', '神無月', '霜月', '師走'];
+    var jpMonths = ['睦月', '如月', '弥生', '卯月', '皐月', '水無月',
+                    '文月', '葉月', '長月', '神無月', '霜月', '師走'];
 
-    Object.values(byMonth).forEach(group => {
-      const mg = document.createElement('div');
+    Object.values(byMonth).forEach(function(group) {
+      var mg = document.createElement('div');
       mg.className = 'month-group';
 
-      const label = document.createElement('div');
+      var label = document.createElement('div');
       label.className = 'month-label';
-      label.innerHTML = `
-        <div>
-          <div class="num">${String(group.month + 1).padStart(2, '0')}</div>
-          <div class="yr">${group.year}</div>
-        </div>
-        <div class="jp">${jpMonths[group.month]}</div>
-      `;
+      label.innerHTML =
+        '<div>' +
+          '<div class="num">' + String(group.month + 1).padStart(2, '0') + '</div>' +
+          '<div class="yr">'  + group.year + '</div>' +
+        '</div>' +
+        '<div class="jp">' + jpMonths[group.month] + '</div>';
       mg.appendChild(label);
 
-      const weeksDiv = document.createElement('div');
+      var weeksDiv = document.createElement('div');
       weeksDiv.className = 'weeks';
 
-      group.weeks.forEach(wk => {
-        const wkEnd = new Date(wk.date);
-        wkEnd.setDate(wkEnd.getDate() + 6);
-        const isPast = wkEnd < today;
-        const isCurrent = wk.idx === currentIdx;
-        const isSelected = selectedIndices.includes(wk.idx);
+      group.weeks.forEach(function(wk) {
+        var wkEnd      = new Date(wk.date); wkEnd.setDate(wkEnd.getDate() + 6);
+        var isPast     = wkEnd < today;
+        var isCurrent  = wk.idx === currentIdx;
+        var isSelected = selectedIndices.indexOf(wk.idx) >= 0;
 
-        const row = document.createElement('div');
-        let cls = 'week-row';
-        if (isCurrent) cls += ' is-current';
+        var row = document.createElement('div');
+        var cls = 'week-row';
+        if (isCurrent)  cls += ' is-current';
         if (isPast && !isCurrent) cls += ' is-past';
         if (wk.swapped) cls += ' is-swapped';
         if (wk.skipped) cls += ' is-skipped';
         if (isSelected) cls += ' is-selected';
-        row.className = cls;
+        row.className  = cls;
         row.dataset.idx = wk.idx;
 
-        let tagText;
-        if (wk.skipped) tagText = 'Skip';
-        else if (isCurrent) tagText = 'Current';
-        else if (isPast) tagText = 'Past';
-        else tagText = 'Upcoming';
+        var tagText;
+        if (wk.skipped)      tagText = 'Skip';
+        else if (isCurrent)  tagText = 'Current';
+        else if (isPast)     tagText = 'Past';
+        else                 tagText = 'Upcoming';
 
-        const swappedBadge = wk.swapped ? `<span class="wk-badge">↔ swapped</span>` : '';
-        const skippedBadge = wk.skipped ? `<span class="wk-badge-skip">✕ お休み</span>` : '';
+        var swappedBadge = wk.swapped ? '<span class="wk-badge">↔ swapped</span>' : '';
+        var skippedBadge = wk.skipped ? '<span class="wk-badge-skip">✕ お休み</span>' : '';
 
-        row.innerHTML = `
-          <div class="wk-num">Week ${String(wk.weekNo).padStart(2, '0')}</div>
-          <div class="wk-date">${fmtDate(wk.date)}<span class="dow">月曜〜</span></div>
-          <div class="wk-person">${wk.person} ${swappedBadge}${skippedBadge}</div>
-          <div class="wk-tag">${tagText}</div>
-        `;
+        row.innerHTML =
+          '<div class="wk-num">'    + wk.weekNo + '</div>' +
+          '<div class="wk-date">'   + fmtDate(wk.date) + '<span class="dow">月曜〜</span></div>' +
+          '<div class="wk-person">' + wk.person + ' ' + swappedBadge + skippedBadge + '</div>' +
+          '<div class="wk-tag">'    + tagText + '</div>';
 
-        row.addEventListener('click', () => handleWeekClick(wk.idx, isPast));
+        row.addEventListener('click', (function(idx, past) {
+          return function() { handleWeekClick(idx, past); };
+        })(wk.idx, isPast));
 
         weeksDiv.appendChild(row);
       });
@@ -1193,90 +1233,84 @@
     });
   }
 
-  // === Click Handler (Swap / Skip / None) ===
+  // === Click Handler ===
   function handleWeekClick(idx, isPast) {
-    // Skip mode
     if (skipMode) {
-      if (isPast) {
-        showToast('過去の週はスキップできません', 'none');
-        return;
-      }
-      schedule[idx].skipped = !schedule[idx].skipped;
-      saveState();
-      renderAll();
-      const wk = schedule[idx];
-      const msg = wk.skipped
-        ? `${fmtDate(wk.date)}週 をお休みにしました`
-        : `${fmtDate(wk.date)}週 のお休みを解除しました`;
-      showToast(msg, 'skip');
+      if (isPast) { showToast('過去の週はスキップできません'); return; }
+      doToggleSkip(idx);
       return;
     }
-
-    // Swap mode
     if (!swapMode) return;
-    if (isPast) {
-      showToast('過去の週は交換できません', 'none');
-      return;
-    }
+    if (isPast)   { showToast('過去の週は交換できません'); return; }
 
-    const i = selectedIndices.indexOf(idx);
+    var i = selectedIndices.indexOf(idx);
     if (i >= 0) {
       selectedIndices.splice(i, 1);
     } else {
       selectedIndices.push(idx);
-      if (selectedIndices.length === 2) {
-        openSwapModal();
-        return;
-      }
+      if (selectedIndices.length === 2) { openSwapModal(); return; }
     }
     updateSwapPanel();
     renderSchedule();
   }
 
-  // === Swap Logic ===
+  // === Skip (async) ===
+  function doToggleSkip(idx) {
+    var wk = schedule[idx];
+    showLoading('更新中...');
+    gasGet({ action: 'toggleSkip', id: wk.id })
+      .then(function(res) {
+        wk.skipped = res.skipped;
+        hideLoading();
+        renderAll();
+        showToast(
+          wk.skipped
+            ? fmtDate(wk.date) + '週 をお休みにしました'
+            : fmtDate(wk.date) + '週 のお休みを解除しました',
+          'skip'
+        );
+      })
+      .catch(function(err) {
+        hideLoading();
+        showToast('更新に失敗しました: ' + err.message, 'error');
+      });
+  }
+
+  // === Swap (async) ===
   function openSwapModal() {
-    const [a, b] = selectedIndices;
-    const wkA = schedule[a];
-    const wkB = schedule[b];
-    document.getElementById('modalPreview').innerHTML = `
-      <div class="item">
-        <div class="d">${fmtDate(wkA.date)} 週</div>
-        <div class="p">${wkA.person}</div>
-      </div>
-      <div class="arr">⇌</div>
-      <div class="item">
-        <div class="d">${fmtDate(wkB.date)} 週</div>
-        <div class="p">${wkB.person}</div>
-      </div>
-    `;
+    var wkA = schedule[selectedIndices[0]];
+    var wkB = schedule[selectedIndices[1]];
+    document.getElementById('modalPreview').innerHTML =
+      '<div class="item"><div class="d">' + fmtDate(wkA.date) + ' 週</div><div class="p">' + wkA.person + '</div></div>' +
+      '<div class="arr">⇌</div>' +
+      '<div class="item"><div class="d">' + fmtDate(wkB.date) + ' 週</div><div class="p">' + wkB.person + '</div></div>';
     document.getElementById('modalBackdrop').classList.add('show');
   }
 
   function executeSwap() {
-    const [a, b] = selectedIndices;
-    const wkA = schedule[a];
-    const wkB = schedule[b];
-    const fromA = wkA.person;
-    const fromB = wkB.person;
-
-    const tmp = wkA.person;
-    wkA.person = wkB.person;
-    wkB.person = tmp;
-
-    wkA.swapped = wkA.person !== wkA.originalPerson;
-    wkB.swapped = wkB.person !== wkB.originalPerson;
-
-    history.unshift({
-      from: { date: new Date(wkA.date), person: fromA },
-      to: { date: new Date(wkB.date), person: fromB },
-      timestamp: new Date()
-    });
-
-    selectedIndices = [];
+    var wkA = schedule[selectedIndices[0]];
+    var wkB = schedule[selectedIndices[1]];
+    var dateA = fmtDate(wkA.date);
+    var dateB = fmtDate(wkB.date);
     document.getElementById('modalBackdrop').classList.remove('show');
-    saveState();
-    renderAll();
-    showToast(`${fmtDate(wkA.date)}週 と ${fmtDate(wkB.date)}週 を交換しました`, 'swap');
+    showLoading('交換中...');
+
+    gasGet({ action: 'swap', idA: wkA.id, idB: wkB.id })
+      .then(function() { return gasGet({ action: 'getAll' }); })
+      .then(function(data) {
+        applyData(data);
+        selectedIndices = [];
+        if (swapMode) toggleSwapMode();
+        hideLoading();
+        renderAll();
+        showToast(dateA + '週 と ' + dateB + '週 を交換しました', 'swap');
+      })
+      .catch(function(err) {
+        selectedIndices = [];
+        hideLoading();
+        showToast('交換に失敗しました: ' + err.message, 'error');
+        renderSchedule();
+      });
   }
 
   function cancelModal() {
@@ -1286,10 +1320,9 @@
     renderSchedule();
   }
 
+  // === Swap Mode ===
   function toggleSwapMode() {
-    // Turn off skip mode if active
     if (skipMode) turnOffSkipMode();
-
     swapMode = !swapMode;
     document.body.classList.toggle('swap-mode', swapMode);
     selectedIndices = [];
@@ -1301,26 +1334,24 @@
   }
 
   function updateSwapPanel() {
-    const title = document.getElementById('swapTitle');
-    const desc = document.getElementById('swapDesc');
+    var title = document.getElementById('swapTitle');
+    var desc  = document.getElementById('swapDesc');
     if (!swapMode) {
       title.textContent = '🔄 当番を交換する';
-      desc.textContent = '「交換モード」をONにして、入れ替えたい2つの週をタップしてください';
+      desc.textContent  = '「交換モード」をONにして、入れ替えたい2つの週をタップしてください';
     } else if (selectedIndices.length === 0) {
       title.textContent = '🔄 交換モード：1つ目を選択してください';
-      desc.textContent = '入れ替えたい週の行をタップ';
-    } else if (selectedIndices.length === 1) {
-      const wk = schedule[selectedIndices[0]];
-      title.textContent = `🔄 ${fmtDate(wk.date)} (${wk.person}) を選択中`;
-      desc.textContent = '入れ替え先の週をタップしてください';
+      desc.textContent  = '入れ替えたい週の行をタップ';
+    } else {
+      var wk = schedule[selectedIndices[0]];
+      title.textContent = '🔄 ' + fmtDate(wk.date) + ' (' + wk.person + ') を選択中';
+      desc.textContent  = '入れ替え先の週をタップしてください';
     }
   }
 
-  // === Skip Logic ===
+  // === Skip Mode ===
   function toggleSkipMode() {
-    // Turn off swap mode if active
     if (swapMode) toggleSwapMode();
-
     skipMode = !skipMode;
     document.body.classList.toggle('skip-mode', skipMode);
     document.getElementById('skipPanel').classList.toggle('is-skip-active', skipMode);
@@ -1340,33 +1371,35 @@
   }
 
   function updateSkipPanel() {
-    const title = document.getElementById('skipTitle');
-    const desc = document.getElementById('skipDesc');
+    var title = document.getElementById('skipTitle');
+    var desc  = document.getElementById('skipDesc');
     if (!skipMode) {
       title.textContent = '🗓 週をスキップする';
-      desc.textContent = '「スキップモード」をONにして、お休みにしたい週をタップ（もう一度タップで解除）';
+      desc.textContent  = '「スキップモード」をONにして、お休みにしたい週をタップ（もう一度タップで解除）';
     } else {
       title.textContent = '🗓 スキップモード：お休みにする週をタップ';
-      desc.textContent = 'タップした週を「お休み」にします。もう一度タップすると解除できます';
+      desc.textContent  = 'タップした週を「お休み」にします。もう一度タップすると解除できます';
     }
   }
 
   // === History ===
   function renderHistory() {
-    const section = document.getElementById('historySection');
-    const list = document.getElementById('historyList');
-    if (history.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
+    var section = document.getElementById('historySection');
+    var list    = document.getElementById('historyList');
+    if (!history || history.length === 0) { section.style.display = 'none'; return; }
     section.style.display = 'block';
-    list.innerHTML = history.slice(0, 5).map(h => {
-      const t = new Date(h.timestamp);
-      const timeStr = `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-      return `<div class="history-item">
-        <span>${fmtDate(new Date(h.from.date))}(${h.from.person}) ⇌ ${fmtDate(new Date(h.to.date))}(${h.to.person})</span>
-        <span class="meta-time">${timeStr}</span>
-      </div>`;
+    list.innerHTML = history.slice(0, 5).map(function(h) {
+      var t       = h.timestamp ? new Date(h.timestamp) : null;
+      var timeStr = t
+        ? (t.getMonth() + 1) + '/' + t.getDate() + ' ' +
+          String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')
+        : '—';
+      var from = h.fromDate ? fmtDate(h.fromDate) + '(' + h.fromPerson + ')' : '—';
+      var to   = h.toDate   ? fmtDate(h.toDate)   + '(' + h.toPerson   + ')' : '—';
+      return '<div class="history-item">' +
+        '<span>' + from + ' ⇌ ' + to + '</span>' +
+        '<span class="meta-time">' + timeStr + '</span>' +
+        '</div>';
     }).join('');
   }
 
@@ -1378,29 +1411,30 @@
   }
 
   // === Filters ===
-  document.getElementById('filters').addEventListener('click', (e) => {
+  document.getElementById('filters').addEventListener('click', function(e) {
     if (!e.target.matches('.filter')) return;
-    document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.filter').forEach(function(b) { b.classList.remove('active'); });
     e.target.classList.add('active');
     activeFilter = e.target.dataset.f;
     renderSchedule();
   });
 
   // === Toast ===
-  function showToast(msg, type = 'none') {
-    const t = document.getElementById('toast');
+  function showToast(msg, type) {
+    var t = document.getElementById('toast');
     t.textContent = msg;
-    t.classList.remove('swap', 'skip');
-    if (type === 'swap') t.classList.add('swap');
-    if (type === 'skip') t.classList.add('skip');
+    t.classList.remove('swap', 'skip', 'error');
+    if (type === 'swap')  t.classList.add('swap');
+    if (type === 'skip')  t.classList.add('skip');
+    if (type === 'error') t.classList.add('error');
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
+    setTimeout(function() { t.classList.remove('show'); }, 3000);
   }
 
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(
-      () => showToast('コピーしました'),
-      () => showToast('コピーに失敗しました')
+      function() { showToast('コピーしました'); },
+      function() { showToast('コピーに失敗しました'); }
     );
   }
 
@@ -1411,110 +1445,36 @@
   document.getElementById('skipCancel').addEventListener('click', toggleSkipMode);
   document.getElementById('modalConfirm').addEventListener('click', executeSwap);
   document.getElementById('modalCancel').addEventListener('click', cancelModal);
-  document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+  document.getElementById('modalBackdrop').addEventListener('click', function(e) {
     if (e.target.id === 'modalBackdrop') cancelModal();
   });
 
-  document.getElementById('copyWeek').addEventListener('click', () => {
-    const wk = schedule[currentIdx];
-    const end = new Date(wk.date); end.setDate(end.getDate() + 6);
-    const skipNote = wk.skipped ? '\n⚠️ この週はお休みです' : '';
-    const text = `📣 今週のゴミ捨て当番\n\n${fmtDateFull(wk.date)} 〜 ${fmtDate(end)}\n担当：${wk.person} さん${skipNote}\n\nよろしくお願いします！`;
-    copyToClipboard(text);
+  document.getElementById('copyWeek').addEventListener('click', function() {
+    var wk  = schedule[currentIdx];
+    var end = new Date(wk.date); end.setDate(end.getDate() + 6);
+    var skipNote = wk.skipped ? '\n⚠️ この週はお休みです' : '';
+    copyToClipboard(
+      '📣 今週のゴミ捨て当番\n\n' +
+      fmtDateFull(wk.date) + ' 〜 ' + fmtDate(end) + '\n' +
+      '担当：' + wk.person + ' さん' + skipNote + '\n\nよろしくお願いします！'
+    );
   });
 
-  document.getElementById('copyAll').addEventListener('click', () => {
-    const lines = schedule.map(wk => {
-      const end = new Date(wk.date); end.setDate(end.getDate() + 6);
-      const skipMark = wk.skipped ? ' ※お休み' : '';
-      const swapMark = wk.swapped ? ' ※交換済' : '';
-      return `${fmtDate(wk.date)}〜${fmtDate(end)}　${wk.person}${swapMark}${skipMark}`;
+  document.getElementById('copyAll').addEventListener('click', function() {
+    var lines = schedule.map(function(wk) {
+      var end      = new Date(wk.date); end.setDate(end.getDate() + 6);
+      var skipMark = wk.skipped ? ' ※お休み' : '';
+      var swapMark = wk.swapped ? ' ※交換済' : '';
+      return fmtDate(wk.date) + '〜' + fmtDate(end) + '　' + wk.person + swapMark + skipMark;
     });
     copyToClipboard('■ ゴミ捨て当番カレンダー (2026.4.27〜2027.3.29)\n\n' + lines.join('\n'));
   });
 
-  // === Export / Import ===
-  document.getElementById('exportState').addEventListener('click', () => {
-    const state = {
-      version: 2,
-      schedule: schedule.map(wk => ({
-        date: wk.date.toISOString(),
-        person: wk.person,
-        originalPerson: wk.originalPerson,
-        weekNo: wk.weekNo,
-        swapped: wk.swapped,
-        skipped: wk.skipped || false
-      })),
-      history: history.map(h => ({
-        from: { date: h.from.date.toISOString(), person: h.from.person },
-        to: { date: h.to.date.toISOString(), person: h.to.person },
-        timestamp: h.timestamp.toISOString()
-      })),
-      exportedAt: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `gomi-touban-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('状態を保存しました');
-  });
+  document.getElementById('reloadBtn').addEventListener('click', fetchFromGAS);
+  document.getElementById('printBtn').addEventListener('click', function() { window.print(); });
 
-  document.getElementById('importState').addEventListener('click', () => {
-    document.getElementById('fileInput').click();
-  });
-
-  document.getElementById('fileInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const state = JSON.parse(ev.target.result);
-        if (!state.schedule) throw new Error('Invalid file');
-        schedule = state.schedule.map(wk => ({
-          date: new Date(wk.date),
-          person: wk.person,
-          originalPerson: wk.originalPerson,
-          weekNo: wk.weekNo,
-          swapped: wk.swapped || false,
-          skipped: wk.skipped || false
-        }));
-        history = (state.history || []).map(h => ({
-          from: { date: new Date(h.from.date), person: h.from.person },
-          to: { date: new Date(h.to.date), person: h.to.person },
-          timestamp: new Date(h.timestamp)
-        }));
-        currentIdx = findCurrentWeekIndex();
-        saveState();
-        renderAll();
-        showToast('状態を読み込みました', 'swap');
-      } catch (err) {
-        showToast('ファイルの読み込みに失敗しました');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  });
-
-  document.getElementById('resetState').addEventListener('click', () => {
-    if (!confirm('全ての交換・スキップをリセットして初期状態に戻しますか？')) return;
-    schedule = generateSchedule();
-    history = [];
-    selectedIndices = [];
-    if (swapMode) toggleSwapMode();
-    if (skipMode) toggleSkipMode();
-    saveState();
-    renderAll();
-    showToast('リセットしました');
-  });
-
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
-
-  // Initial render
-  renderAll();
+  // === Initial Load ===
+  fetchFromGAS();
 </script>
 </body>
 </html>
